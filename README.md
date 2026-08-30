@@ -6,7 +6,7 @@ Portable multi-instance launcher for [Minecraft Bedrock Server Manager](https://
 
 ```text
 BSM\
-├── Launcher.bat
+├── launcher.bat
 ├── App\
 │   └── BedrockServerManager.exe
 └── Instances\
@@ -19,6 +19,6 @@ BSM\
 
 * Put `BedrockServerManager.exe` in `App`.
 * Create server instances as folders inside `Instances`.
-* Run `Launcher.bat`.
+* Run `launcher.bat`.
 * Press **Enter** to launch `Default`.
 * Press **R** to refresh the instance list.
