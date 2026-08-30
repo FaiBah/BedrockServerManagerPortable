@@ -62,4 +62,6 @@ jobs:
           tag_name: ${{ env.VERSION }}
           name: Bedrock Server Manager Portable ${{ env.VERSION }}
           files: ${{ env.PACKAGE }}
-          generate_release_notes: true
+          body: |
+            Full Changelog:
+            https://github.com/schrebra/Minecraft-Bedrock-Manager-CSharp/commits/${{ env.VERSION }}
