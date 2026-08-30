@@ -1,3 +1,4 @@
+```yaml
 name: Release
 
 on:
@@ -50,13 +51,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$env:VERSION" 2>$null
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
 
-          if ($LASTEXITCODE -eq 0) {
+          $url = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$env:VERSION"
+
+          try {
+            Invoke-RestMethod -Uri $url -Headers $headers | Out-Null
             Write-Host "Release $env:VERSION already exists. Skipping."
             "SKIP=true" >> $env:GITHUB_OUTPUT
-          } else {
-            "SKIP=false" >> $env:GITHUB_OUTPUT
+          }
+          catch {
+            if ($_.Exception.Response.StatusCode -eq 404) {
+              Write-Host "Release $env:VERSION does not exist. Continuing."
+              "SKIP=false" >> $env:GITHUB_OUTPUT
+            }
+            else {
+              throw
+            }
           }
 
       - name: Prepare package
@@ -105,3 +120,4 @@ jobs:
           body: |
             Full Changelog:
             https://github.com/schrebra/Minecraft-Bedrock-Manager-CSharp/commits/${{ env.VERSION }}
+```
