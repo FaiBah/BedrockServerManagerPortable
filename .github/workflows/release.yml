@@ -11,19 +11,27 @@ jobs:
       contents: write
 
     steps:
-      - name: Check launcher
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Get latest BSM release
-        id: upstream
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if (-not (Test-Path "launcher.bat")) {
             throw "launcher.bat not found."
           }
 
+          $headers = @{
+            Authorization = "Bearer $env:GH_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+
           $release = Invoke-RestMethod `
-            -Uri "https://api.github.com/repos/schrebra/Minecraft-Bedrock-Manager-CSharp/releases/latest"
+            -Uri "https://api.github.com/repos/schrebra/Minecraft-Bedrock-Manager-CSharp/releases/latest" `
+            -Headers $headers
 
           $asset = $release.assets |
             Where-Object { $_.name -eq "BedrockServerManager.exe" } |
@@ -62,11 +70,13 @@ jobs:
             -Uri "$env:DOWNLOAD_URL" `
             -OutFile "$build\App\BedrockServerManager.exe"
 
-          if (-not (Test-Path "$build\App\BedrockServerManager.exe")) {
+          $exe = "$build\App\BedrockServerManager.exe"
+
+          if (-not (Test-Path $exe)) {
             throw "Download failed."
           }
 
-          if ((Get-Item "$build\App\BedrockServerManager.exe").Length -eq 0) {
+          if ((Get-Item $exe).Length -eq 0) {
             throw "Downloaded EXE is empty."
           }
 
