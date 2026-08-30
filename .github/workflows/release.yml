@@ -11,12 +11,17 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout
+      - name: Check launcher
         uses: actions/checkout@v4
 
       - name: Get latest BSM release
+        id: upstream
         shell: pwsh
         run: |
+          if (-not (Test-Path "launcher.bat")) {
+            throw "launcher.bat not found."
+          }
+
           $release = Invoke-RestMethod `
             -Uri "https://api.github.com/repos/schrebra/Minecraft-Bedrock-Manager-CSharp/releases/latest"
 
@@ -31,32 +36,57 @@ jobs:
           "VERSION=$($release.tag_name)" >> $env:GITHUB_ENV
           "DOWNLOAD_URL=$($asset.browser_download_url)" >> $env:GITHUB_ENV
 
+      - name: Check existing release
+        id: check
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$env:VERSION" 2>$null
+
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $env:VERSION already exists. Skipping."
+            "SKIP=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "SKIP=false" >> $env:GITHUB_OUTPUT
+          }
+
       - name: Prepare package
+        if: steps.check.outputs.SKIP != 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "App" -Force | Out-Null
+          $build = Join-Path $env:RUNNER_TEMP "BSM"
+          New-Item -ItemType Directory -Path "$build\App" -Force | Out-Null
 
           Invoke-WebRequest `
             -Uri "$env:DOWNLOAD_URL" `
-            -OutFile "App\BedrockServerManager.exe"
+            -OutFile "$build\App\BedrockServerManager.exe"
 
-          if (-not (Test-Path "launcher.bat")) {
-            throw "launcher.bat not found."
+          if (-not (Test-Path "$build\App\BedrockServerManager.exe")) {
+            throw "Download failed."
           }
 
-      - name: Create package
-        shell: pwsh
-        run: |
+          if ((Get-Item "$build\App\BedrockServerManager.exe").Length -eq 0) {
+            throw "Downloaded EXE is empty."
+          }
+
+          Copy-Item "launcher.bat" "$build\launcher.bat"
+
           $package = "BedrockServerManagerPortable-$env:VERSION.zip"
 
           Compress-Archive `
-            -Path "launcher.bat", "App" `
+            -Path "$build\launcher.bat", "$build\App" `
             -DestinationPath $package `
             -Force
+
+          if (-not (Test-Path $package)) {
+            throw "Package creation failed."
+          }
 
           "PACKAGE=$package" >> $env:GITHUB_ENV
 
       - name: Create GitHub Release
+        if: steps.check.outputs.SKIP != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
