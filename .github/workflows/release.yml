@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get latest BSM release
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod `
+            -Uri "https://api.github.com/repos/schrebra/Minecraft-Bedrock-Manager-CSharp/releases/latest"
+
+          $asset = $release.assets |
+            Where-Object { $_.name -eq "BedrockServerManager.exe" } |
+            Select-Object -First 1
+
+          if (-not $asset) {
+            throw "BedrockServerManager.exe not found in upstream release."
+          }
+
+          "VERSION=$($release.tag_name)" >> $env:GITHUB_ENV
+          "DOWNLOAD_URL=$($asset.browser_download_url)" >> $env:GITHUB_ENV
+
+      - name: Prepare package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "App" -Force | Out-Null
+
+          Invoke-WebRequest `
+            -Uri "$env:DOWNLOAD_URL" `
+            -OutFile "App\BedrockServerManager.exe"
+
+          if (-not (Test-Path "launcher.bat")) {
+            throw "launcher.bat not found."
+          }
+
+      - name: Create package
+        shell: pwsh
+        run: |
+          $package = "BedrockServerManagerPortable-$env:VERSION.zip"
+
+          Compress-Archive `
+            -Path "launcher.bat", "App" `
+            -DestinationPath $package `
+            -Force
+
+          "PACKAGE=$package" >> $env:GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: Bedrock Server Manager Portable ${{ env.VERSION }}
+          files: ${{ env.PACKAGE }}
+          generate_release_notes: true
